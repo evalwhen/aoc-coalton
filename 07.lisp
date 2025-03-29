@@ -379,4 +379,24 @@
                        ((Err e) (Err e))
                        ((Ok (Tuple e str))
                         (Ok (Tuple (f a b c d e) str))))))))))))))))
+  ;;
+  (define-type Equation
+    (Equation Integer (List Integer)))
+ 
+  (declare parse-equation (Parser Equation))
+  (define parse-equation
+    (map3 (fn (a b_ c) (Equation a c))
+          natural
+          (char #\:)
+          (many1 (map2 (fn (_ x) x)
+                       (char #\Space)
+                       natural))))
+  
+  (declare parse-equations (Parser (List Equation)))
+  (define parse-equations
+    (many1
+     (map2 (fn (a _) a) 
+           parse-equation
+           (char #\Newline))))
   )
+ 
