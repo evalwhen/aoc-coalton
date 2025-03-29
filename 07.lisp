@@ -17,8 +17,8 @@
 
 (named-readtables:in-readtable coalton:coalton)
 
+;; Opaque type for string views
 (coalton-toplevel
-  ;; Opaque type for string views
   (repr :native cl:string)
   (define-type StringView)
 
@@ -65,7 +65,11 @@
         (cl:if (cl:= 0 (cl:length arr))
                True
                False))))
-  ;; Parser Type
+
+  )
+
+;; Parser Type and basic parsers
+(coalton-toplevel
   (define-type ParseError
     (ParseError String)
     (Context String ParseError))
@@ -224,10 +228,13 @@
              (match i
                ((Some a) (const-value a))
                ((None) (fail "Invalid integer")))))))
-  ;;
-  ;; Parser combinators
-  ;;
 
+  )
+
+;;
+;; Parser combinators
+;;
+(coalton-toplevel
   (declare many0 ((Parser :a) -> (Parser (List :a))))
   (define (many0 p_)
     (let ((p (get-parser p_))
@@ -379,7 +386,10 @@
                        ((Err e) (Err e))
                        ((Ok (Tuple e str))
                         (Ok (Tuple (f a b c d e) str))))))))))))))))
-  ;;
+  )
+ 
+;; 2024 aoc 07 day
+(coalton-toplevel
   (define-type Equation
     (Equation Integer (List Integer)))
  
@@ -398,5 +408,5 @@
      (map2 (fn (a _) a) 
            parse-equation
            (char #\Newline))))
+
   )
- 
