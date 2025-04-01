@@ -10,11 +10,10 @@
    #:coalton-library/functions
    #:asum)
   (:export
-   #:always-returns-zero
-   #:one-element-list))
+   #:run-equation-parser
+   ))
 
 (cl:in-package :aoc-coalton-2024-07)
-
 (named-readtables:in-readtable coalton:coalton)
 
 ;; Opaque type for string views
@@ -392,7 +391,7 @@
 (coalton-toplevel
  (define-type Equation
    (Equation Integer (List Integer)))
- 
+  
  (declare parse-equation (Parser Equation))
  (define parse-equation
    (map3 (fn (a b_ c) (Equation a c))
@@ -408,5 +407,7 @@
     (map2 (fn (a _) a) 
           parse-equation
           (char #\Newline))))
-
+ ;; Now, we can expose the functionality to the world
+ (define (run-equation-parser str)
+   (run-parser parse-equation (make-string-view str)))
  )
