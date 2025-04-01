@@ -390,24 +390,34 @@
 ;; 2024 aoc 07 day
 (coalton-toplevel
  (define-type Equation
-   (Equation Integer (List Integer)))
-  
+              (Equation Integer (List Integer)))
+ 
  (declare parse-equation (Parser Equation))
  (define parse-equation
-   (map3 (fn (a b_ c) (Equation a c))
-         natural
-         (char #\:)
-         (many1 (map2 (fn (_ x) x)
-                      (char #\Space)
-                      natural))))
-  
+         (map3 (fn (a b_ c) (Equation a c))
+               natural
+               (char #\:)
+               (many1 (map2 (fn (_ x) x)
+                            (char #\Space)
+                            natural))))
+ 
  (declare parse-equations (Parser (List Equation)))
  (define parse-equations
-   (many1
-    (map2 (fn (a _) a) 
-          parse-equation
-          (char #\Newline))))
+         (many1
+          (map2 (fn (a _) a) 
+                parse-equation
+                (char #\Newline))))
  ;; Now, we can expose the functionality to the world
  (define (run-equation-parser str)
-   (run-parser parse-equation (make-string-view str)))
+         (run-parser parse-equation (make-string-view str)))
+
+ (declare equations ((Integer -> Integer -> Integer) -> (Integer -> Boolean) -> (List Integer) -> (List Integer)))
+ (define (equations ops stop ints)
+         (rec go ((xs ints))
+              (match xs
+                     ((Cons x xs) (if (stop x)
+                                      (make-list)
+                                    (match xs
+                                           ((Nil) (make-list x))
+                                           (Cons y zs) (>>= ops (fn (op) (Cons (op x y) (go zs))))))))))
  )
