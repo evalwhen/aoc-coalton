@@ -229,12 +229,9 @@
                ((Some a) (const-value a))
                ((None) (fail "Invalid integer")))))))
 
-  )
-
-;;
-;; Parser combinators
-;;
-(coalton-toplevel
+  ;;
+  ;; Parser combinators
+  ;;
   (declare many0 ((Parser :a) -> (Parser (List :a))))
   (define (many0 p_)
     (let ((p (get-parser p_))
@@ -386,6 +383,9 @@
                        ((Err e) (Err e))
                        ((Ok (Tuple e str))
                         (Ok (Tuple (f a b c d e) str))))))))))))))))
+  )
+
+(coalton-toplevel
   )
  
 ;; 2024 aoc 07 day
