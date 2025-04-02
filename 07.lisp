@@ -389,35 +389,52 @@
  
 ;; 2024 aoc 07 day
 (coalton-toplevel
- (define-type Equation
-              (Equation Integer (List Integer)))
- 
- (declare parse-equation (Parser Equation))
- (define parse-equation
-         (map3 (fn (a b_ c) (Equation a c))
-               natural
-               (char #\:)
-               (many1 (map2 (fn (_ x) x)
-                            (char #\Space)
-                            natural))))
- 
- (declare parse-equations (Parser (List Equation)))
- (define parse-equations
-         (many1
-          (map2 (fn (a _) a) 
-                parse-equation
-                (char #\Newline))))
- ;; Now, we can expose the functionality to the world
- (define (run-equation-parser str)
-         (run-parser parse-equation (make-string-view str)))
+  (define-type Equation
+    (Equation Integer (List Integer)))
+  
+  (declare parse-equation (Parser Equation))
+  (define parse-equation
+    (map3 (fn (a b_ c) (Equation a c))
+          natural
+          (char #\:)
+          (many1 (map2 (fn (_ x) x)
+                       (char #\Space)
+                       natural))))
+  
+  (declare parse-equations (Parser (List Equation)))
+  (define parse-equations
+    (many1
+     (map2 (fn (a _) a) 
+           parse-equation
+           (char #\newline))))
+  ;; Now, we can expose the functionality to the world
+  (define (run-equation-parser str)
+    (run-parser parse-equations (make-string-view str)))
 
- (declare equations ((Integer -> Integer -> Integer) -> (Integer -> Boolean) -> (List Integer) -> (List Integer)))
- (define (equations ops stop ints)
-         (rec go ((xs ints))
-              (match xs
-                     ((Cons x xs) (if (stop x)
-                                      (make-list)
-                                    (match xs
-                                           ((Nil) (make-list x))
-                                           (Cons y zs) (>>= ops (fn (op) (Cons (op x y) (go zs))))))))))
- )
+  (declare evalation ((List (Integer -> Integer -> Integer)) -> (Integer -> Boolean) -> (List Integer) -> (List Integer)))
+  (define (evalation ops stop ints)
+    (rec go ((xs ints))
+      (match xs
+        ((Cons x xs) (if (stop x)
+                         (make-list)
+                         (match xs
+                           ((Nil) (make-list x))
+                           ((Cons y zs) (>>= ops (fn (op) (go (Cons (op x y)  zs)))))))))))
+
+  (declare check ((List (Integer -> Integer -> Integer)) -> (List Equation) -> (List Integer)))
+  (define (check ops eqs)
+    (do
+     (e <- eqs)
+     (let (Equation a xs) = e)
+      (if (any (== a)  (evalation ops (< a) xs))
+          (pure a)
+          (make-list))
+      ))
+
+  (declare solve (String -> Integer))
+  (define (solve str)
+    (let ((res (run-equation-parser str)))
+      (match res
+        ((Ok es) (sum (check (make-list * +) es)))
+        ((Err _) 0))))
+  ) 
