@@ -1,9 +1,14 @@
-(defsystem "aoc-coalton"
-  :depends-on ("coalton" "named-readtables")
+(in-package :cl-user)
+(defpackage :aoc-coalton-asd
+  (:use :cl :asdf))
+(in-package :aoc-coalton-asd)
+
+(asdf:defsystem "aoc-coalton"
+  :depends-on (:coalton :named-readtables)
   :components ((:file "07"))
   :in-order-to ((test-op (test-op "aoc-coalton/test"))))
 
-(defsystem :aoc-coalton/test
+(asdf:defsystem :aoc-coalton/test
   :depends-on (:aoc-coalton
                :coalton/testing 
                :fiasco)

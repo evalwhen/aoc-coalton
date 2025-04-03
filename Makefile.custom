@@ -1,0 +1,17 @@
+LISP?=sbcl
+
+build:
+	$(LISP) --non-interactive \
+		--load aoc-coalton.asd \
+		--eval '(ql:quickload :aoc-coalton)' \
+		--eval '(asdf:make :aoc-coalton)'
+
+test:
+	$(LISP) --non-interactive \
+		--load aoc-coalton.asd \
+		--load aoc-coalton-test.asd \
+	     	--eval '(ql:quickload :aoc-coalton)' \
+	     	--eval '(ql:quickload :aoc-coalton-test)' \
+	     	--eval '(prove:run #P"tests/test-aoc-coalton.lisp")' \
+	     	--eval '(prove:run #P"tests/test-1337.lisp")' \
+	     	--eval '(prove:run #P"tests/test-downloadsme.lisp")'

@@ -5,12 +5,15 @@
    #:coalton
    #:coalton-prelude)
   (:local-nicknames
-   (#:string #:coalton-library/string))
+   (#:string #:coalton-library/string)
+   (#:file #:coalton-library/file)
+   )
   (:import-from
    #:coalton-library/functions
    #:asum)
   (:export
    #:run-equation-parser
+   #:main
    ))
 
 (cl:in-package :aoc-coalton-2024-07)
@@ -69,323 +72,335 @@
 
 ;; Parser Type and basic parsers
 (coalton-toplevel
- (define-type ParseError
-   (ParseError String)
-   (Context String ParseError))
+  (define-type ParseError
+    (ParseError String)
+    (Context String ParseError))
 
- (define parse-error-eof (ParseError "EOF"))
+  (define-instance (Signalable ParseError)
+    (define (error ferr)
+      (match ferr
+        ((ParseError str1)
+         (error (lisp String (str1)
+                  (cl:format cl:nil "Parse Error:~%~%~a" str1))))
+        ((Context str errStr)
+         (error (lisp String (str errStr)
+                  (cl:format cl:nil "Parse Error with context:~%~%~a ~a" str errStr))))
+        )))
 
- (declare incomplete-parse-error (String -> ParseError))
- (define (incomplete-parse-error str)
-   (ParseError (lisp String (str) (cl:format cl:nil "Parser did not complete: ~A" str))))
 
- (define-type (Parser :a)
-   (Parser (StringView -> (Result ParseError (Tuple :a StringView)))))
+  (define parse-error-eof (ParseError "EOF"))
 
- (declare get-parser ((Parser :a) -> StringView -> (Result ParseError (Tuple :a StringView))))
- (define (get-parser p)
-   (match p
-     ((Parser x) x)))
+  (declare incomplete-parse-error (String -> ParseError))
+  (define (incomplete-parse-error str)
+    (ParseError (lisp String (str) (cl:format cl:nil "Parser did not complete: ~A" str))))
 
- (declare run-parser ((Parser :a) -> StringView -> (Result ParseError :a)))
- (define (run-parser p_ str)
-   ;; Unwrap Parser function
-   (let ((p (get-parser p_)))
-     (match (p str)
-       ((Err e) (Err e))
-       ((Ok (Tuple a str))
-        (if (string-view-empty-p str)
-            (Ok a)
-            (Err (incomplete-parse-error (string-view-get str))))))))
+  (define-type (Parser :a)
+    (Parser (StringView -> (Result ParseError (Tuple :a StringView)))))
 
- ;;
- ;; Error tracking
- ;;
-  
- (declare with-context (String -> (Parser :a) -> (Parser :a)))
- (define (with-context s p)
-   (map-error (Context s) p))
+  (declare get-parser ((Parser :a) -> StringView -> (Result ParseError (Tuple :a StringView))))
+  (define (get-parser p)
+    (match p
+      ((Parser x) x)))
 
- (declare map-error ((ParseError -> ParseError) -> (Parser :a) -> (Parser :a)))
- (define (map-error f p_)
-   (let ((p (get-parser p_)))
-     (Parser
-      (fn (str)
-          (match (p str)
-            ((Err e) (Err (f e)))
-            ((Ok (Tuple a str))
-             (Ok (Tuple a str))))))))
+  (declare run-parser ((Parser :a) -> StringView -> (Result ParseError :a)))
+  (define (run-parser p_ str)
+    ;; Unwrap Parser function
+    (let ((p (get-parser p_)))
+      (match (p str)
+        ((Err e) (Err e))
+        ((Ok (Tuple a str))
+         (if (string-view-empty-p str)
+             (Ok a)
+             (Err (incomplete-parse-error (string-view-get str))))))))
 
- ;;
- ;; Some basic parsers
- ;;
+  ;;
+  ;; Error tracking
+  ;;
 
- (declare const-value (:a -> (Parser :a)))
- (define (const-value x)
-   (Parser
-    (fn (str)
-        (Ok (Tuple x str)))))
- ;;
- ;; Define some basic value parsers
- ;;
+  (declare with-context (String -> (Parser :a) -> (Parser :a)))
+  (define (with-context s p)
+    (map-error (Context s) p))
 
- (declare eof (Parser Unit))
- (define eof
-   (Parser
-    (fn (str)
-        (match (next-char str)
-          ((Some (Tuple read-char _)) (Err (ParseError (lisp String (read-char)
-                                                             (cl:format cl:nil "Unexpected character '~A' expected EOF" read-char)))))
-          ((None) (Ok (Tuple Unit str)))))))
+  (declare map-error ((ParseError -> ParseError) -> (Parser :a) -> (Parser :a)))
+  (define (map-error f p_)
+    (let ((p (get-parser p_)))
+      (Parser
+       (fn (str)
+         (match (p str)
+           ((Err e) (Err (f e)))
+           ((Ok (Tuple a str))
+            (Ok (Tuple a str))))))))
 
- (declare take (Parser coalton:Char))
- (define take
-   (Parser
-    (fn (str)
-        (match (next-char str)
-          ((Some t_)
-           (Ok t_))
-          ((None) (Err parse-error-eof))))))
+  ;;
+  ;; Some basic parsers
+  ;;
 
- (declare char (coalton:Char -> (Parser coalton:Char)))
- (define (char c)
-   (Parser
-    (fn (str)
-        (match (next-char str)
-          ((Some t_)
-           (let ((read-char (fst t_)))
-             (if (== c read-char)
-                 (Ok t_)
-                 (Err (ParseError (lisp String (read-char c) (cl:format cl:nil "Unexpected character '~A' expected '~A'" read-char c)))))))
-          ((None) (Err parse-error-eof))))))
+  (declare const-value (:a -> (Parser :a)))
+  (define (const-value x)
+    (Parser
+     (fn (str)
+       (Ok (Tuple x str)))))
+  ;;
+  ;; Define some basic value parsers
+  ;;
 
- (declare not-char (coalton:Char -> (Parser coalton:Char)))
- (define (not-char c)
-   (Parser
-    (fn (str)
-        (match (next-char str)
-          ((Some t_)
-           (let ((read-char (fst t_)))
-             (if (== c read-char)
-                 (Err (ParseError (lisp String (read-char c) (cl:format cl:nil "Unexpected character '~A' expected not '~A'" read-char c))))
-                 (Ok t_))))
-          ((None) (Err parse-error-eof))))))
+  (declare eof (Parser Unit))
+  (define eof
+    (Parser
+     (fn (str)
+       (match (next-char str)
+         ((Some (Tuple read-char _)) (Err (ParseError (lisp String (read-char)
+                                                        (cl:format cl:nil "Unexpected character '~A' expected EOF" read-char)))))
+         ((None) (Ok (Tuple Unit str)))))))
 
- (declare parse-string (StringView -> (Parser StringView)))
- (define (parse-string str)
-   (let ((f (fn (s)
-                (match (next-char s)
-                  ((Some (Tuple c s))
-                   (>>= (char c) (fn (_) (f s))))
-                  ((None) (const-value str))))))
-     (f str)))
+  (declare take (Parser coalton:Char))
+  (define take
+    (Parser
+     (fn (str)
+       (match (next-char str)
+         ((Some t_)
+          (Ok t_))
+         ((None) (Err parse-error-eof))))))
 
- (declare whitespace (Parser Unit))
- (define whitespace
-   (map (fn (_) Unit)
-        (alt (char #\Space)
-             (char #\Return))))
+  (declare char (coalton:Char -> (Parser coalton:Char)))
+  (define (char c)
+    (Parser
+     (fn (str)
+       (match (next-char str)
+         ((Some t_)
+          (let ((read-char (fst t_)))
+            (if (== c read-char)
+                (Ok t_)
+                (Err (ParseError (lisp String (read-char c) (cl:format cl:nil "Unexpected character '~A' expected '~A'" read-char c)))))))
+         ((None) (Err parse-error-eof))))))
 
- (declare digit (Parser coalton:Char))
- (define digit
-   (map-error
-    (fn (_) (ParseError "Invalid digit"))
-    (verify
-     (fn (x) (and (>= x #\0)
-                  (<= x #\9)))
-     take)))
+  (declare not-char (coalton:Char -> (Parser coalton:Char)))
+  (define (not-char c)
+    (Parser
+     (fn (str)
+       (match (next-char str)
+         ((Some t_)
+          (let ((read-char (fst t_)))
+            (if (== c read-char)
+                (Err (ParseError (lisp String (read-char c) (cl:format cl:nil "Unexpected character '~A' expected not '~A'" read-char c))))
+                (Ok t_))))
+         ((None) (Err parse-error-eof))))))
 
- (declare lowercase (Parser coalton:Char))
- (define lowercase
-   (map-error
-    (fn (_) (ParseError "Invalid lowercase character"))
-    (verify
-     (fn (x) (and (>= x #\a)
-                  (<= x #\z)))
-     take)))
+  (declare parse-string (StringView -> (Parser StringView)))
+  (define (parse-string str)
+    (let ((f (fn (s)
+               (match (next-char s)
+                 ((Some (Tuple c s))
+                  (>>= (char c) (fn (_) (f s))))
+                 ((None) (const-value str))))))
+      (f str)))
 
- (declare uppercase (Parser coalton:Char))
- (define uppercase
-   (map-error
-    (fn (_) (ParseError "Invalid uppercase character"))
-    (verify
-     (fn (x) (and (>= x #\A)
-                  (<= x #\Z)))
-     take)))
+  (declare whitespace (Parser Unit))
+  (define whitespace
+    (map (fn (_) Unit)
+         (alt (char #\Space)
+              (char #\Return))))
 
- (declare alpha (Parser coalton:Char))
- (define alpha (alt lowercase uppercase))
+  (declare digit (Parser coalton:Char))
+  (define digit
+    (map-error
+     (fn (_) (ParseError "Invalid digit"))
+     (verify
+      (fn (x) (and (>= x #\0)
+                   (<= x #\9)))
+      take)))
 
- (declare alphanumeric (Parser coalton:Char))
- (define alphanumeric (alt alpha digit))
+  (declare lowercase (Parser coalton:Char))
+  (define lowercase
+    (map-error
+     (fn (_) (ParseError "Invalid lowercase character"))
+     (verify
+      (fn (x) (and (>= x #\a)
+                   (<= x #\z)))
+      take)))
 
- (declare natural (Parser Integer))
- (define natural
-   (with-context "While parsing natural number"
-     (>>= (map string:parse-int (map into (many1 digit)))
-          (fn (i)
-              (match i
-                ((Some a) (const-value a))
-                ((None) (fail "Invalid integer")))))))
+  (declare uppercase (Parser coalton:Char))
+  (define uppercase
+    (map-error
+     (fn (_) (ParseError "Invalid uppercase character"))
+     (verify
+      (fn (x) (and (>= x #\A)
+                   (<= x #\Z)))
+      take)))
 
- ;;
- ;; Parser combinators
- ;;
- (declare many0 ((Parser :a) -> (Parser (List :a))))
- (define (many0 p_)
-   (let ((p (get-parser p_))
-         (f (fn (str)
-                (match (p str)
-                  ((Err _) (Tuple Nil str))
-                  ((Ok (Tuple a str))
-                   (match (f str)
-                     ((Tuple b str) (Tuple (Cons a b) str))))))))
-     (Parser
-      (fn (str) (Ok (f str))))))
+  (declare alpha (Parser coalton:Char))
+  (define alpha (alt lowercase uppercase))
 
- (declare many1 ((Parser :a) -> (Parser (List :a))))
- (define (many1 p)
-   (>>= p (fn (a) (map (Cons a) (many0 p)))))
+  (declare alphanumeric (Parser coalton:Char))
+  (define alphanumeric (alt alpha digit))
 
- (declare option ((Parser :a) -> (Parser (Optional :a))))
- (define (option p_)
-   (let ((p (get-parser p_)))
-     (Parser
-      (fn (str)
-          (match (p str)
-            ((Ok (Tuple a str)) (Ok (Tuple (Some a) str)))
-            ((Err _) (Ok (Tuple None str))))))))
+  (declare natural (Parser Integer))
+  (define natural
+    (with-context "While parsing natural number"
+      (>>= (map string:parse-int (map into (many1 digit)))
+           (fn (i)
+             (match i
+               ((Some a) (const-value a))
+               ((None) (fail "Invalid integer")))))))
 
- (declare verify ((:a -> Boolean) -> ((Parser :a) -> (Parser :a))))
- (define (verify f p)
-   (>>= p
-        (fn (x)
-            (match (f x)
-              ((True) (const-value x))
-              ((False) (fail "Validation failed"))))))
+  ;;
+  ;; Parser combinators
+  ;;
+  (declare many0 ((Parser :a) -> (Parser (List :a))))
+  (define (many0 p_)
+    (let ((p (get-parser p_))
+          (f (fn (str)
+               (match (p str)
+                 ((Err _) (Tuple Nil str))
+                 ((Ok (Tuple a str))
+                  (match (f str)
+                    ((Tuple b str) (Tuple (Cons a b) str))))))))
+      (Parser
+       (fn (str) (Ok (f str))))))
 
- (define-instance (Functor Parser)
-   (define (map f p_)
-     (let ((p (get-parser p_)))
-       (Parser
-        (fn (str)
-            (match (p str)
+  (declare many1 ((Parser :a) -> (Parser (List :a))))
+  (define (many1 p)
+    (>>= p (fn (a) (map (Cons a) (many0 p)))))
+
+  (declare option ((Parser :a) -> (Parser (Optional :a))))
+  (define (option p_)
+    (let ((p (get-parser p_)))
+      (Parser
+       (fn (str)
+         (match (p str)
+           ((Ok (Tuple a str)) (Ok (Tuple (Some a) str)))
+           ((Err _) (Ok (Tuple None str))))))))
+
+  (declare verify ((:a -> Boolean) -> ((Parser :a) -> (Parser :a))))
+  (define (verify f p)
+    (>>= p
+         (fn (x)
+           (match (f x)
+             ((True) (const-value x))
+             ((False) (fail "Validation failed"))))))
+
+  (define-instance (Functor Parser)
+    (define (map f p_)
+      (let ((p (get-parser p_)))
+        (Parser
+         (fn (str)
+           (match (p str)
+             ((Err e) (Err e))
+             ((Ok (Tuple a str))
+              (Ok (Tuple (f a) str)))))))))
+
+  (define-instance (Applicative Parser)
+    (define pure const-value) 
+    (define (liftA2 f a b)
+      (do
+       (a <- a)
+       (b <- b)
+        (pure (f a b)))))
+
+  (define-instance (Monad Parser)
+    (define (>>= p_ f)
+      (let ((p (get-parser p_)))
+        (Parser
+         (fn (str)
+           (match (p str)
+             ((Err e) (Err e))
+             ((Ok (Tuple a str))
+              ((get-parser (f a)) str))))))))
+
+  (define-instance (MonadFail Parser)
+    (define (fail s)
+      (Parser
+       (fn (str)
+         (Err (ParseError s))))))
+
+  (define-instance (Alternative Parser)
+    (define (alt p1_ p2_)
+      (let ((p1 (get-parser p1_))
+            (p2 (get-parser p2_)))
+        (Parser
+         (fn (str)
+           (match (p1 str)
+             ((Ok (Tuple a str))
+              (Ok (Tuple a str)))
+             ((Err _)
+              (match (p2 str)
+                ((Err e) (Err e))
+                ((Ok (Tuple b str))
+                 (Ok (Tuple b str))))))))))
+    (define empty (fail "alt")))
+
+  (declare map2 ((:a -> (:b -> :c)) -> ((Parser :a) -> ((Parser :b) -> (Parser :c)))))
+  (define map2 liftA2)
+
+  (declare map3 ((:a -> (:b -> (:c -> :d))) -> ((Parser :a) -> ((Parser :b) -> ((Parser :c) -> (Parser :d))))))
+  (define (map3 f p1_ p2_ p3_)
+    (let ((p1 (get-parser p1_))
+          (p2 (get-parser p2_))
+          (p3 (get-parser p3_)))
+      (Parser
+       (fn (str)
+         (match (p1 str)
+           ((Err e) (Err e))
+           ((Ok (Tuple a str))
+            (match (p2 str)
               ((Err e) (Err e))
-              ((Ok (Tuple a str))
-               (Ok (Tuple (f a) str)))))))))
-
- (define-instance (Applicative Parser)
-   (define pure const-value) 
-   (define (liftA2 f a b)
-     (do
-         (a <- a)
-         (b <- b)
-       (pure (f a b)))))
-
- (define-instance (Monad Parser)
-   (define (>>= p_ f)
-     (let ((p (get-parser p_)))
-       (Parser
-        (fn (str)
-            (match (p str)
-              ((Err e) (Err e))
-              ((Ok (Tuple a str))
-               ((get-parser (f a)) str))))))))
-
- (define-instance (MonadFail Parser)
-   (define (fail s)
-     (Parser
-      (fn (str)
-          (Err (ParseError s))))))
-
- (define-instance (Alternative Parser)
-   (define (alt p1_ p2_)
-     (let ((p1 (get-parser p1_))
-           (p2 (get-parser p2_)))
-       (Parser
-        (fn (str)
-            (match (p1 str)
-              ((Ok (Tuple a str))
-               (Ok (Tuple a str)))
-              ((Err _)
-               (match (p2 str)
+              ((Ok (Tuple b str))
+               (match (p3 str)
                  ((Err e) (Err e))
-                 ((Ok (Tuple b str))
-                  (Ok (Tuple b str))))))))))
-   (define empty (fail "alt")))
+                 ((Ok (Tuple c str))
+                  (Ok (Tuple (f a b c) str))))))))))))
 
- (declare map2 ((:a -> (:b -> :c)) -> ((Parser :a) -> ((Parser :b) -> (Parser :c)))))
- (define map2 liftA2)
+  (declare map4 ((:a -> (:b -> (:c -> (:d -> :e)))) -> ((Parser :a) -> ((Parser :b) -> ((Parser :c) -> ((Parser :d) -> (Parser :e)))))))
+  (define (map4 f p1_ p2_ p3_ p4_)
+    (let ((p1 (get-parser p1_))
+          (p2 (get-parser p2_))
+          (p3 (get-parser p3_))
+          (p4 (get-parser p4_)))
+      (Parser
+       (fn (str)
+         (match (p1 str)
+           ((Err e) (Err e))
+           ((Ok (Tuple a str))
+            (match (p2 str)
+              ((Err e) (Err e))
+              ((Ok (Tuple b str))
+               (match (p3 str)
+                 ((Err e) (Err e))
+                 ((Ok (Tuple c str))
+                  (match (p4 str)
+                    ((Err e) (Err e))
+                    ((Ok (Tuple d str))
+                     (Ok (Tuple (f a b c d) str))))))))))))))
 
- (declare map3 ((:a -> (:b -> (:c -> :d))) -> ((Parser :a) -> ((Parser :b) -> ((Parser :c) -> (Parser :d))))))
- (define (map3 f p1_ p2_ p3_)
-   (let ((p1 (get-parser p1_))
-         (p2 (get-parser p2_))
-         (p3 (get-parser p3_)))
-     (Parser
-      (fn (str)
-          (match (p1 str)
-            ((Err e) (Err e))
-            ((Ok (Tuple a str))
-             (match (p2 str)
-               ((Err e) (Err e))
-               ((Ok (Tuple b str))
-                (match (p3 str)
-                  ((Err e) (Err e))
-                  ((Ok (Tuple c str))
-                   (Ok (Tuple (f a b c) str))))))))))))
-
- (declare map4 ((:a -> (:b -> (:c -> (:d -> :e)))) -> ((Parser :a) -> ((Parser :b) -> ((Parser :c) -> ((Parser :d) -> (Parser :e)))))))
- (define (map4 f p1_ p2_ p3_ p4_)
-   (let ((p1 (get-parser p1_))
-         (p2 (get-parser p2_))
-         (p3 (get-parser p3_))
-         (p4 (get-parser p4_)))
-     (Parser
-      (fn (str)
-          (match (p1 str)
-            ((Err e) (Err e))
-            ((Ok (Tuple a str))
-             (match (p2 str)
-               ((Err e) (Err e))
-               ((Ok (Tuple b str))
-                (match (p3 str)
-                  ((Err e) (Err e))
-                  ((Ok (Tuple c str))
-                   (match (p4 str)
-                     ((Err e) (Err e))
-                     ((Ok (Tuple d str))
-                      (Ok (Tuple (f a b c d) str))))))))))))))
-
- (declare map5 ((:a -> (:b -> (:c -> (:d -> (:e -> :f))))) -> ((Parser :a) -> ((Parser :b) -> ((Parser :c) -> ((Parser :d) -> ((Parser :e) -> (Parser :f))))))))
- (define (map5 f p1_ p2_ p3_ p4_ p5_)
-   (let ((p1 (get-parser p1_))
-         (p2 (get-parser p2_))
-         (p3 (get-parser p3_))
-         (p4 (get-parser p4_))
-         (p5 (get-parser p5_)))
-     (Parser
-      (fn (str)
-          (match (p1 str)
-            ((Err e) (Err e))
-            ((Ok (Tuple a str))
-             (match (p2 str)
-               ((Err e) (Err e))
-               ((Ok (Tuple b str))
-                (match (p3 str)
-                  ((Err e) (Err e))
-                  ((Ok (Tuple c str))
-                   (match (p4 str)
-                     ((Err e) (Err e))
-                     ((Ok (Tuple d str))
-                      (match (p5 str)
-                        ((Err e) (Err e))
-                        ((Ok (Tuple e str))
-                         (Ok (Tuple (f a b c d e) str))))))))))))))))
- )
+  (declare map5 ((:a -> (:b -> (:c -> (:d -> (:e -> :f))))) -> ((Parser :a) -> ((Parser :b) -> ((Parser :c) -> ((Parser :d) -> ((Parser :e) -> (Parser :f))))))))
+  (define (map5 f p1_ p2_ p3_ p4_ p5_)
+    (let ((p1 (get-parser p1_))
+          (p2 (get-parser p2_))
+          (p3 (get-parser p3_))
+          (p4 (get-parser p4_))
+          (p5 (get-parser p5_)))
+      (Parser
+       (fn (str)
+         (match (p1 str)
+           ((Err e) (Err e))
+           ((Ok (Tuple a str))
+            (match (p2 str)
+              ((Err e) (Err e))
+              ((Ok (Tuple b str))
+               (match (p3 str)
+                 ((Err e) (Err e))
+                 ((Ok (Tuple c str))
+                  (match (p4 str)
+                    ((Err e) (Err e))
+                    ((Ok (Tuple d str))
+                     (match (p5 str)
+                       ((Err e) (Err e))
+                       ((Ok (Tuple e str))
+                        (Ok (Tuple (f a b c d e) str))))))))))))))))
+  )
 
 (coalton-toplevel
- )
+  )
  
 ;; 2024 aoc 07 day
 (coalton-toplevel
@@ -406,7 +421,7 @@
     (many1
      (map2 (fn (a _) a) 
            parse-equation
-           (char #\newline))))
+           (char #\linefeed))))
   ;; Now, we can expose the functionality to the world
   (define (run-equation-parser str)
     (run-parser parse-equations (make-string-view str)))
@@ -436,5 +451,19 @@
     (let ((res (run-equation-parser str)))
       (match res
         ((Ok es) (sum (check (make-list * +) es)))
-        ((Err _) 0))))
+        ((Err err) (error err)))))
+
+  (declare run (Unit -> Integer))
+  (define (run)
+    (match (file:read-file-to-string "input.txt")
+      ((Ok str) (solve str))
+      ((Err err) (error err))))
   ) 
+
+(cl:defun main ()
+  (uiop:println "part1:")
+  (uiop:println (run Unit))
+  (uiop:println "part2:")
+  (uiop:println "TODO")
+  ;; (coalton Unit)
+  )
