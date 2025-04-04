@@ -1,5 +1,5 @@
 (defpackage :aoc-coalton-2024-07
-  (:documentation "aoc 2024 07")
+  (:documentation "aoc 2024 07 https://adventofcode.com/2024/day/7")
   (:shadow #:take)
   (:use
    #:coalton
@@ -9,9 +9,11 @@
   (:local-nicknames
    (#:string #:coalton-library/string)
    (#:file #:coalton-library/file)
-   ;; (#:parsec #:simple-parsec)
    )
   (:shadowing-import-from :parsec #:char)
+  (:import-from
+   #:coalton-library/math/integral
+   #:div)
   (:import-from
    #:coalton-library/functions
    #:asum)
@@ -47,7 +49,9 @@
   (define (run-equation-parser str)
     (run-parser parse-equations (make-string-view str)))
 
-  (declare evalation ((List (Integer -> Integer -> Integer)) -> (Integer -> Boolean) -> (List Integer) -> (List Integer)))
+  (define-type-alias Ops (List (Integer -> Integer -> Integer)))
+
+  (declare evalation (Ops -> (Integer -> Boolean) -> (List Integer) -> (List Integer)))
   (define (evalation ops stop ints)
     (rec go ((xs ints))
       (match xs
@@ -57,7 +61,7 @@
                            ((Nil) (make-list x))
                            ((Cons y zs) (>>= ops (fn (op) (go (Cons (op x y)  zs)))))))))))
 
-  (declare check ((List (Integer -> Integer -> Integer)) -> (List Equation) -> (List Integer)))
+  (declare check (Ops -> (List Equation) -> (List Integer)))
   (define (check ops eqs)
     (do
      (e <- eqs)
@@ -67,24 +71,40 @@
           (make-list))
       ))
 
-  (declare solve (String -> Integer))
-  (define (solve str)
+  (declare solve (Ops -> String -> Integer))
+  (define (solve ops str)
     (let ((res (run-equation-parser str)))
       (match res
-        ((Ok es) (sum (check (make-list * +) es)))
+        ((Ok es) (sum (check ops es)))
         ((Err err) (error err)))))
 
-  (declare run (Unit -> Integer))
-  (define (run)
+  (declare run (Ops -> Integer))
+  (define (run ops)
     (match (file:read-file-to-string "input.txt")
-      ((Ok str) (solve str))
+      ((Ok str) (solve ops str))
       ((Err err) (error err))))
+
+  (define (digits-count n)
+    (rec go ((n n)
+             (acc 1))
+      (cond
+        ((< n 10) acc)
+        (True (go (div n 10) (1+ acc))))))
+
+
+  ;; The concatenation operator (||) combines the digits from its left
+  ;; and right inputs into a single number. For example, 12 || 345
+  ;; would become 12345. All operators are still evaluated
+  ;; left-to-right.
+  (define (op3 x y)
+    (+ (* x (^ 10 (digits-count y)))
+       y))
   ) 
 
 (cl:defun main ()
   (uiop:println "part1:")
-  (uiop:println (run Unit))
+  (uiop:println (coalton (run (make-list * +))))
   (uiop:println "part2:")
-  (uiop:println "TODO")
+  (uiop:println (coalton (run (make-list * + op3))))
   ;; (coalton Unit)
   )
