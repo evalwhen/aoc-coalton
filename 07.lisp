@@ -1,6 +1,6 @@
 (defpackage :aoc-coalton-2024-07
   (:documentation "aoc 2024 07")
-  (:shadow #:take #:char)
+  (:shadow #:take)
   (:use
    #:coalton
    #:coalton-prelude
@@ -11,6 +11,7 @@
    (#:file #:coalton-library/file)
    ;; (#:parsec #:simple-parsec)
    )
+  (:shadowing-import-from :parsec #:char)
   (:import-from
    #:coalton-library/functions
    #:asum)
@@ -31,9 +32,9 @@
   (define parse-equation
     (map3 (fn (a b_ c) (Equation a c))
           natural
-          (parsec:char #\:)
+          (char #\:)
           (many1 (map2 (fn (_ x) x)
-                       (parsec:char #\Space)
+                       (char #\Space)
                        natural))))
   
   (declare parse-equations (Parser (List Equation)))
@@ -41,7 +42,7 @@
     (many1
      (map2 (fn (a _) a) 
            parse-equation
-           (parsec:char #\linefeed))))
+           (char #\linefeed))))
   ;; Now, we can expose the functionality to the world
   (define (run-equation-parser str)
     (run-parser parse-equations (make-string-view str)))
