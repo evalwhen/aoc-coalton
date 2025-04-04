@@ -5,7 +5,9 @@
 
 (asdf:defsystem "aoc-coalton"
   :depends-on (:coalton :named-readtables)
-  :components ((:file "07"))
+  :components ((:file "parsec")
+               (:file "07")
+               )
   :in-order-to ((test-op (test-op "aoc-coalton/test"))))
 
 (asdf:defsystem :aoc-coalton/test
