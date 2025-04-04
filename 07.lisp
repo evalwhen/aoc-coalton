@@ -4,11 +4,12 @@
   (:use
    #:coalton
    #:coalton-prelude
+   #:parsec
    )
   (:local-nicknames
    (#:string #:coalton-library/string)
    (#:file #:coalton-library/file)
-   (#:parsec #:simple-parsec)
+   ;; (#:parsec #:simple-parsec)
    )
   (:import-from
    #:coalton-library/functions

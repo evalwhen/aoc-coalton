@@ -1,4 +1,4 @@
-(defpackage :simple-parsec
+(defpackage :parsec
   (:documentation "simple parser combinator like haskell parsec library")
   (:shadow #:take #:char)
   (:use
@@ -23,7 +23,7 @@
    ))
 
 
-(in-package :simple-parsec)
+(in-package :parsec)
 
 (named-readtables:in-readtable coalton:coalton)
 
