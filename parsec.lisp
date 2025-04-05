@@ -19,6 +19,7 @@
    #:many1
    #:map2
    #:map3
+   #:lines
    #:run-parser
    ))
 
